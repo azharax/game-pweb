@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="id">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Canvas Puzzle Game | Tugas Pertemuan 6</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background-color: #f0f2f5;
+                margin: 0;
+                padding: 20px;
+            }
+            .container {
+                max-width: 800px;
+                width: 100%;
+                background-color: white;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+
+            h1 {
+                text-align: center;
+                color: #333;
+            }
+            #game_container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
+            }
+            #pzl_canvas {
+                border: 2px solid #333;
+                max-width: 100%;
+            }
+            .ctrl {
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            button {
+                padding: 10px 20px;
+                font-size: 16px;
+                cursor: pointer;
+                background-color: #4caf50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            button:hover {
+                background-color: #45a049;
+            }
+            input[type="file"] {
+                display: none;
+            }
+            .fup {
+                padding: 10px 20px;
+                background-color: #2196f3;
+                color: white;
+                cursor: pointer;
+                border-radius: 5px;
+            }
+            .fup:hover {
+                background-color: #1976d2;
+            }
+            select {
+                padding: 10px;
+                font-size: 16px;
+            }
+            #timer {
+                font-size: 20px;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Canvas Puzzle Game</h1>
+            <div id="game_container">
+                <div id="timer">Waktu: 00:00</div>
+                <canvas id="pzl_canvas" width="600" height="400"></canvas>
+                <p>Upload gambar berukuran : 600x400</p>
+                <div class="ctrl">
+                    <label class="fup">
+                        Pilih Gambar
+                        <input type="file" id="image_input" accept="image/*" />
+                    </label>
+                    <select id="pc">
+                        <option value="16">16 Potongan (4x4)</option>
+                        <option value="36">36 Potongan (6x6)</option>
+                        <option value="64">64 Potongan (8x8)</option>
+                        <option value="100">100 Potongan (10x10)</option>
+                    </select>
+
+                    <button id="start">Acak Puzzle</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const canvas = document.getElementById("pzl_canvas");
+            const ctx = canvas.getContext("2d");
+            const imageInput = document.getElementById("image_input");
+            const pcSelect = document.getElementById("pc");
+            const startButton = document.getElementById("start");
+            const timerElement = document.getElementById("timer");
+
+            let pieces = [];
+            let selected = null;
+            let img = new Image();
+            let startTime;
+            let tmrInterval;
+
+            class Piece {
+                constructor(x, y, width, height, index) {
+                    this.x = x;
+                    this.y = y;
+                    this.width = width;
+                    this.height = height;
+                    this.index = index;
+                    this.correctX = x;
+                    this.correctY = y;
+                }
+            }
+
+            function initializePuzzle() {
+                const x = parseInt(pcSelect.value);
+                const rows = Math.sqrt(x);
+                const xw = canvas.width / rows;
+                const xh = canvas.height / rows;
+
+                pieces = [];
+                for (let i = 0; i < rows; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        pieces.push(
+                            new Piece(j * xw, i * xh, xw, xh, i * rows + j)
+                        );
+                    }
+                }
+            }
+
+            function randomize() {
+                for (let i = pieces.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pieces[i].x, pieces[j].x] = [pieces[j].x, pieces[i].x];
+                    [pieces[i].y, pieces[j].y] = [pieces[j].y, pieces[i].y];
+                }
+                startGame();
+            }
+
+            function drawPieces() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                pieces.forEach((piece) => {
+                    ctx.drawImage(
+                        img,
+                        piece.correctX,
+                        piece.correctY,
+                        piece.width,
+                        piece.height,
+                        piece.x,
+                        piece.y,
+                        piece.width,
+                        piece.height
+                    );
+                    ctx.strokeRect(piece.x, piece.y, piece.width, piece.height);
+                });
+            }
+
+            function startGame() {
+                if (tmrInterval) clearInterval(tmrInterval);
+                startTime = new Date();
+                tmrInterval = setInterval(updateTimer, 1000);
+            }
+
+            function updateTimer() {
+                const currentTime = new Date();
+                const timeDiff = Math.floor((currentTime - startTime) / 1000);
+                const minutes = Math.floor(timeDiff / 60);
+                const seconds = timeDiff % 60;
+                timerElement.textContent = `Waktu: ${minutes
+                    .toString()
+                    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+            }
+
+            function checkWin() {
+                return pieces.every(
+                    (piece) =>
+                        piece.x === piece.correctX && piece.y === piece.correctY
+                );
+            }
+
+            canvas.addEventListener("mousedown", (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                pieces.forEach((piece) => {
+                    if (
+                        x > piece.x &&
+                        x < piece.x + piece.width &&
+                        y > piece.y &&
+                        y < piece.y + piece.height
+                    ) {
+                        selected = piece;
+                    }
+                });
+            });
+
+            canvas.addEventListener("mousemove", (e) => {
+                if (!selected) return;
+
+                const rect = canvas.getBoundingClientRect();
+                selected.x = e.clientX - rect.left - selected.width / 2;
+                selected.y = e.clientY - rect.top - selected.height / 2;
+
+                drawPieces();
+            });
+
+            canvas.addEventListener("mouseup", () => {
+                if (!selected) return;
+
+                const pieceCount = parseInt(pcSelect.value);
+                const rows = Math.sqrt(pieceCount);
+                const pieceWidth = canvas.width / rows;
+                const pieceHeight = canvas.height / rows;
+
+                const snapX = Math.round(selected.x / pieceWidth) * pieceWidth;
+                const snapY =
+                    Math.round(selected.y / pieceHeight) * pieceHeight;
+
+                const existingPiece = pieces.find(
+                    (p) => p !== selected && p.x === snapX && p.y === snapY
+                );
+
+                if (existingPiece) {
+                    [selected.x, existingPiece.x] = [
+                        existingPiece.x,
+                        selected.x,
+                    ];
+                    [selected.y, existingPiece.y] = [
+                        existingPiece.y,
+                        selected.y,
+                    ];
+                } else {
+                    selected.x = snapX;
+                    selected.y = snapY;
+                }
+
+                selected = null;
+                drawPieces();
+
+                if (checkWin()) {
+                    clearInterval(tmrInterval);
+                    setTimeout(() => {
+                        alert("Selamat! Anda telah menyelesaikan puzzle!");
+                    }, 500);
+                }
+            });
+
+            imageInput.addEventListener("change", (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    img.onload = function () {
+                        initializePuzzle();
+                        randomize();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            pcSelect.addEventListener("change", () => {
+                if (img.src) {
+                    initializePuzzle();
+                    randomize();
+                }
+            });
+
+            startButton.addEventListener("click", () => {
+                if (img.src) {
+                    randomize();
+                }
+            });
+
+            img.src =
+                "https://media.istockphoto.com/id/1411481752/id/vektor/spanduk-web-dengan-frasa-mulai-game-baru-latar-belakang-layar-sci-fi-dengan-desain-neon.jpg?s=612x612&w=0&k=20&c=w5E5S_87du8PEbrsJsX-njlkWerDrAoEFU9M8TRkGHU=";
+            img.onload = function () {
+                initializePuzzle();
+                randomize();
+            };
+        </script>
+    </body>
+</html>
